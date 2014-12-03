@@ -23,6 +23,33 @@ namespace TSVCEO.DataModelling
         public override string StackTrace { get { return _StackTrace; } }
     }
 
+    public static class EntityMapExtensions
+    {
+        public static IColumnMap IsOptional(this IColumnMap map)
+        {
+            map.Column.Type.IsNullable = true;
+            return map;
+        }
+
+        public static IColumnMap IsRequired(this IColumnMap map)
+        {
+            map.Column.Type.IsNullable = false;
+            return map;
+        }
+
+        public static IForeignKeyMap IsOptional(this IForeignKeyMap map)
+        {
+            map.IsOptional = true;
+            return map;
+        }
+
+        public static IForeignKeyMap IsRequired(this IForeignKeyMap map)
+        {
+            map.IsOptional = true;
+            return map;
+        }
+    }
+
     public abstract class EntityMapper
     {
         public IEntityMap EntityMap;
