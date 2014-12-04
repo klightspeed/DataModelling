@@ -165,19 +165,41 @@ namespace TSVCEO.DataModelling
 
         protected IUniqueKeyMap AddUniqueKey(string keyname, IEnumerable<LambdaExpression> columns)
         {
-            var uq = new UniqueKeyMap(EntityMap, "AK_" + typeof(TEntity).Name + "_" + keyname);
-            List<IColumnDef> coldefs = new List<IColumnDef>();
+            IColumnRefCollection colrefs = new ColumnRefCollection(EntityMap);
             foreach (LambdaExpression colsel in columns)
             {
                 string propname = ((MemberExpression)colsel.Body).Member.Name;
-                uq.Columns.Add(EntityMap.Columns.Single(c => c.Column.PropertyName == propname).Column);
+                colrefs.Add(EntityMap.Columns.Single(c => c.Column.PropertyName == propname).Column);
             }
 
-            EntityMap.UniqueKeys.Add(uq);
+            if (keyname == null)
+            {
+                keyname = String.Join("_", colrefs.Select(c => c.Name));
+            }
+
+            keyname = "AK_" + typeof(TEntity).Name + "_" + keyname;
+
+            IUniqueKeyMap uq = EntityMap.UniqueKeys.SingleOrDefault(ak => ak.KeyName == keyname);
+
+            if (uq == null)
+            {
+                uq = new UniqueKeyMap(EntityMap, keyname);
+
+                foreach (IColumnDef colref in colrefs)
+                {
+                    uq.Columns.Add(colref);
+                }
+
+                EntityMap.UniqueKeys.Add(uq);
+            }
+            else if (!uq.Columns.Equals(colrefs))
+            {
+                throw new InvalidOperationException("Requested unique key does not reference same columns");
+            }
 
             return uq;
         }
-        
+
         public IUniqueKeyMap AddUniqueKey<TOut>(string keyname, Expression<Func<TEntity, TOut>> colsels)
         {
             return AddUniqueKey(keyname, GetSelectors(colsels));
@@ -327,7 +349,7 @@ namespace TSVCEO.DataModelling
 
             if (tgt != null)
             {
-                IUniqueKeyMap uniquekey = tgtmapper.AddUniqueKey(keyname, new LambdaExpression[] { idpropsel }.Union(GetSelectors(tgtcolumns)));
+                IUniqueKeyMap uniquekey = tgtmapper.AddUniqueKey(null, new LambdaExpression[] { idpropsel }.Union(GetSelectors(tgtcolumns)));
 
                 if (uniquekey == null)
                 {
@@ -449,7 +471,7 @@ namespace TSVCEO.DataModelling
             foreach (LambdaExpression selector in GetSelectors(propsel))
             {
                 string colname = ((MemberExpression)selector.Body).Member.Name;
-                index.Columns.Add(EntityMap.Columns.Single(c => c.Column.Name == colname).Column);
+                index.Columns.Add(EntityMap.Columns.Single(c => c.Column.Name.ToLower() == colname.ToLower()).Column);
             }
 
             EntityMap.FullTextIndex = index;
@@ -812,7 +834,7 @@ namespace TSVCEO.DataModelling
             
         public virtual bool Equals(IColumnRef other)
         {
-            return other != null && this.Table.TableName == other.Table.TableName && this.Name == other.Name;
+            return other != null && this.Table.TableName.ToLower() == other.Table.TableName.ToLower() && this.Name.ToLower() == other.Name.ToLower();
         }
 
         public override string ToString()
@@ -1120,7 +1142,6 @@ namespace TSVCEO.DataModelling
         public bool Equals(IForeignKeyMap other)
         {
             return other != null &&
-                this.KeyName == other.KeyName &&
                 this.Columns.Equals(other.Columns) &&
                 this.ReferencedKey.Equals(other.ReferencedKey);
         }
@@ -1360,7 +1381,7 @@ namespace TSVCEO.DataModelling
 
         public virtual bool Equals(IIndexMap other)
         {
-            return other != null && this.Table == other.Table && this.Columns.Count == other.Columns.Count && this.Columns.Zip(other.Columns, (i, o) => new { i, o }).All(v => v.i.Equals(v.o));
+            return other != null && this.Columns.Count == other.Columns.Count && this.Columns.Zip(other.Columns, (i, o) => new { i, o }).All(v => v.i.Equals(v.o));
         }
     }
 
@@ -1379,7 +1400,7 @@ namespace TSVCEO.DataModelling
 
         public virtual bool Equals(IFullTextIndexMap other)
         {
-            return other != null && this.Table == other.Table && this.Columns.Count == other.Columns.Count && this.Columns.Zip(other.Columns, (i, o) => new { i, o }).All(v => v.i.Equals(v.o));
+            return other != null && this.Columns.Count == other.Columns.Count && this.Columns.Zip(other.Columns, (i, o) => new { i, o }).All(v => v.i.Equals(v.o));
         }
     }
 

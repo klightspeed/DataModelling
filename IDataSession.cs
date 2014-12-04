@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
 
 namespace TSVCEO.DataModelling
 {
@@ -8,5 +9,6 @@ namespace TSVCEO.DataModelling
         IRepository<TEntity> Set<TEntity>() where TEntity : class;
         void SaveChanges();
         void Close();
+        DbConnection Database { get; }
     }
 }

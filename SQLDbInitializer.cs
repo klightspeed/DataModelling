@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Data;
+using System.Data.Common;
 using System.Linq.Expressions;
 using System.Text;
 using System.Reflection;
@@ -38,20 +39,8 @@ namespace TSVCEO.DataModelling
         public abstract bool SupportsAddDropConstraint { get; }
         public abstract bool ColumnDataIsVariant { get; }
 
-        List<IEntityMap> newmaps;
-        List<IEntityMap> oldmaps;
-
-        public SQLDbInitializer(IEnumerable<IEntityMap> maps)
-        {
-            newmaps = maps.ToList();
-            oldmaps = new List<IEntityMap>();
-        }
-
-        public SQLDbInitializer(IEnumerable<IEntityMap> maps, IEnumerable<IEntityMap> original)
-        {
-            newmaps = maps.ToList();
-            oldmaps = original.ToList();
-        }
+        protected List<IEntityMap> newmaps;
+        protected List<IEntityMap> oldmaps;
 
         protected virtual string EscapeColumnName(string colname)
         {
@@ -113,6 +102,66 @@ namespace TSVCEO.DataModelling
             }
         }
 
+        protected virtual int IntBits(IColumnType type)
+        {
+            switch (type.DataType)
+            {
+                case DbType.Boolean: return 1;
+                case DbType.Byte: return 8;
+                case DbType.UInt16: return 16;
+                case DbType.UInt32: return 32;
+                case DbType.UInt64: return 64;
+                case DbType.SByte: return 7;
+                case DbType.Int16: return 15;
+                case DbType.Int32: return 31;
+                case DbType.Int64: return 63;
+                case DbType.Single: return 23;
+                case DbType.Double: return 52;
+                case DbType.Decimal: return Math.Min(96, (int)(((type.Precision ?? 0) - (type.Scale ?? 0)) * 3.322));
+                case DbType.Currency: return 49;
+                default: return 0;
+            }
+        }
+
+        protected virtual bool IsSigned(IColumnType type)
+        {
+            switch (type.DataType)
+            {
+                case DbType.SByte: return true;
+                case DbType.Int16: return true;
+                case DbType.Int32: return true;
+                case DbType.Int64: return true;
+                case DbType.Decimal: return true;
+                case DbType.Single: return true;
+                case DbType.Double: return true;
+                case DbType.Currency: return true;
+                default: return false;
+            }
+        }
+
+        protected virtual bool IsLosslessCast(IColumnType from, IColumnType to)
+        {
+            if (from == to) return true;
+            if (from.IsNullable && !to.IsNullable) return false;
+            if ((from.Length ?? Int32.MaxValue) > (to.Length ?? Int32.MaxValue)) return false;
+            if (from.DataType == DbType.AnsiString && to.DataType == DbType.String) return true;
+            if (from.DataType == DbType.AnsiStringFixedLength && (to.DataType == DbType.AnsiString || to.DataType == DbType.StringFixedLength || to.DataType == DbType.String)) return true;
+            if (from.DataType == DbType.Xml && to.DataType == DbType.String) return true;
+            if (from.DataType == DbType.Date && (to.DataType == DbType.DateTime || to.DataType == DbType.DateTime2)) return true;
+            if (IntBits(from) == 0 && from.DataType != DbType.Decimal) return false;
+            if ((to.DataType == DbType.AnsiString || to.DataType == DbType.String) && (to.Length ?? Int32.MaxValue) >= 32) return true;
+            if (from.DataType == DbType.Decimal && from.Precision <= 6 && to.DataType == DbType.Single) return true;
+            if (from.DataType == DbType.Decimal && from.Precision <= 15 && to.DataType == DbType.Double) return true;
+            if (from.DataType == DbType.Currency && to.DataType == DbType.Decimal && to.Precision - to.Scale >= 19 && to.Scale >= 4) return true;
+            if (from.DataType == DbType.Decimal && to.DataType == DbType.Currency && from.Precision - from.Scale < 19 && from.Scale <= 4) return true;
+            if (from.DataType == DbType.Single && to.DataType == DbType.Double) return true;
+            if (from.DataType == DbType.Single || from.DataType == DbType.Double || from.Scale != 0) return false;
+            if ((from.Scale ?? 0) > (to.Scale ?? 0)) return false;
+            if (IntBits(from) > IntBits(to)) return false;
+            if (IsSigned(from) && !IsSigned(to)) return false;
+            return true;
+        }
+
         protected virtual string GetTypeName(IColumnType type)
         {
             return String.Format("{0} {1}",
@@ -123,42 +172,42 @@ namespace TSVCEO.DataModelling
 
         protected virtual IEnumerable<IUniqueKeyMap> GetAddedUniqueKeys(IEntityMap map, IEntityMap original)
         {
-            return map == null ? new IUniqueKeyMap[0] : map.UniqueKeys.Where(ak => original == null || !original.UniqueKeys.Any(oak => oak.KeyName == ak.KeyName && oak.Equals(ak)));
+            return map == null ? new IUniqueKeyMap[0] : map.UniqueKeys.Where(ak => original == null || !original.UniqueKeys.Any(oak => oak.Equals(ak)));
         }
 
         protected virtual IEnumerable<IUniqueKeyMap> GetDroppedUniqueKeys(IEntityMap map, IEntityMap original)
         {
-            return original == null ? new IUniqueKeyMap[0] : original.UniqueKeys.Where(ak => map == null || !map.UniqueKeys.Any(nak => nak.KeyName == ak.KeyName && nak.Equals(ak)));
+            return original == null ? new IUniqueKeyMap[0] : original.UniqueKeys.Where(ak => map == null || !map.UniqueKeys.Any(nak => nak.Equals(ak)));
         }
 
         protected virtual IEnumerable<IForeignKeyMap> GetAddedForeignKeys(IEntityMap map, IEntityMap original)
         {
-            return map == null ? new IForeignKeyMap[0] : map.ForeignKeys.Where(fk => original == null || !original.ForeignKeys.Any(ofk => ofk.KeyName == fk.KeyName && ofk.Equals(fk)));
+            return map == null ? new IForeignKeyMap[0] : map.ForeignKeys.Where(fk => original == null || !original.ForeignKeys.Any(ofk => ofk.Equals(fk)));
         }
 
         protected virtual IEnumerable<IForeignKeyMap> GetDroppedForeignKeys(IEntityMap map, IEntityMap original)
         {
-            return original == null ? new IForeignKeyMap[0] : original.ForeignKeys.Where(fk => map == null || !map.ForeignKeys.Any(nfk => nfk.KeyName == fk.KeyName && nfk.Equals(fk)));
+            return original == null ? new IForeignKeyMap[0] : original.ForeignKeys.Where(fk => map == null || !map.ForeignKeys.Any(nfk => nfk.Equals(fk)));
         }
 
         protected virtual IEnumerable<IColumnDef> GetCopiedColumns(IEntityMap map, IEntityMap original)
         {
-            return (original == null || map == null) ? new IColumnDef[0] : map.Columns.Where(c => original.Columns.Any(oc => oc.Column.Name == c.Column.Name)).Select(c => c.Column);
+            return (original == null || map == null) ? new IColumnDef[0] : map.Columns.Where(c => original.Columns.Any(oc => oc.Column.Name.ToLower() == c.Column.Name.ToLower())).Select(c => c.Column);
         }
 
         protected virtual IEnumerable<IColumnDef> GetAddedColumns(IEntityMap map, IEntityMap original)
         {
-            return (original == null || map == null) ? new IColumnDef[0] : map.Columns.Where(c => !original.Columns.Any(oc => oc.Column.Name == c.Column.Name)).Select(c => c.Column);
+            return (original == null || map == null) ? new IColumnDef[0] : map.Columns.Where(c => !original.Columns.Any(oc => oc.Column.Name.ToLower() == c.Column.Name.ToLower())).Select(c => c.Column);
         }
 
         protected virtual IEnumerable<IColumnDef> GetDroppedColumns(IEntityMap map, IEntityMap original)
         {
-            return (original == null || map == null) ? new IColumnDef[0] : original.Columns.Where(c => !map.Columns.Any(nc => nc.Column.Name == c.Column.Name)).Select(c => c.Column);
+            return (original == null || map == null) ? new IColumnDef[0] : original.Columns.Where(c => !map.Columns.Any(nc => nc.Column.Name.ToLower() == c.Column.Name.ToLower())).Select(c => c.Column);
         }
 
         protected virtual IEnumerable<ColumnDefPair> GetChangedColumns(IEntityMap map, IEntityMap original)
         {
-            return (original == null || map == null) ? new ColumnDefPair[0] : map.Columns.Select(c => new ColumnDefPair { New = c.Column, Old = original.Columns.Where(oc => oc.Column.Name == c.Column.Name).Select(oc => oc.Column).SingleOrDefault() }).Where(t => t.Old != null && !t.New.Equals(t.Old));
+            return (original == null || map == null) ? new ColumnDefPair[0] : map.Columns.Select(c => new ColumnDefPair { New = c.Column, Old = original.Columns.Where(oc => oc.Column.Name.ToLower() == c.Column.Name.ToLower()).Select(oc => oc.Column).SingleOrDefault() }).Where(t => t.Old != null && !t.New.Equals(t.Old));
         }
         
         protected virtual IEnumerable<IColumnDef> GetBreakingChangedColumns(IEntityMap map, IEntityMap original)
@@ -166,12 +215,7 @@ namespace TSVCEO.DataModelling
             if (map != null && original != null)
             {
                 return GetChangedColumns(map, original)
-                    .Where(c =>
-                        c.New.Type.DataType != c.Old.Type.DataType ||
-			            c.New.Type.Length < c.Old.Type.Length ||
-			            c.New.Type.Precision < c.Old.Type.Precision ||
-			            c.New.Type.Scale < c.Old.Type.Scale
-                    )
+                    .Where(c => !IsLosslessCast(c.Old.Type, c.New.Type))
                     .Select(c => c.New);
             }
             else
@@ -185,12 +229,7 @@ namespace TSVCEO.DataModelling
             if (map != null && original != null)
             {
                 return GetChangedColumns(map, original)
-                    .Where(c =>
-                        c.New.Type.DataType == c.Old.Type.DataType &&
-                        c.New.Type.Length >= c.Old.Type.Length &&
-                        c.New.Type.Precision >= c.Old.Type.Precision &&
-                        c.New.Type.Scale >= c.Old.Type.Scale
-                    )
+                    .Where(c => IsLosslessCast(c.Old.Type, c.New.Type))
                     .Select(c => c.New);
             }
             else
@@ -485,7 +524,7 @@ namespace TSVCEO.DataModelling
                     throw new InvalidOperationException("Change would result in data loss");
                 }
 
-                string newtablename = map.TableName + "_copy_" + Guid.NewGuid().ToString().Substring(16, 8);
+                string newtablename = map.TableName + "_copy_" + Guid.NewGuid().ToString().Substring(0, 8);
 
                 return DDLAddTable(map, null, newtablename)
                     .Concat(DDLCopyTable(map, original, newtablename))
@@ -519,60 +558,98 @@ namespace TSVCEO.DataModelling
             }
         }
 
-        protected virtual IEnumerable<string> DDLBeforeCopyAndRenameTables(IEnumerable<EntityMappingPair> mappairs)
+        protected virtual IEnumerable<string> DDLBeforeModifyTables(IEnumerable<EntityMappingPair> mappairs)
         {
-            throw new NotImplementedException();
+            return new string[0];
         }
 
-        protected virtual IEnumerable<string> DDLAfterCopyAndRenameTables(IEnumerable<EntityMappingPair> mappairs)
+        protected virtual IEnumerable<string> DDLAfterModifyTables(IEnumerable<EntityMappingPair> mappairs)
         {
-            throw new NotImplementedException();
+            return new string[0];
         }
         
-        protected virtual IEnumerable<string> DDLCopyAndRenameTables(IEnumerable<EntityMappingPair> mappairs)
+        public virtual IEnumerable<string> GetDDL(IEnumerable<IEntityMap> newmaps, IEnumerable<IEntityMap> oldmaps)
         {
-            if (mappairs.Any(m => RequireCopyRenameTable(m.New, m.Old)))
-            {
-                return DDLBeforeCopyAndRenameTables(mappairs)
-                    .Concat(mappairs.SelectMany(p => DDLCopyAndRenameTable(p.New, p.Old)))
-                    .Concat(DDLAfterCopyAndRenameTables(mappairs));
-            }
-            else
-            {
-                return new string[0];
-            }
-        }
+            IEntityMap[] _newmaps = newmaps.ToArray();
+            IEntityMap[] _oldmaps = oldmaps.ToArray();
 
-        public virtual IEnumerable<string> GetDDL()
-        {
-            var mappairs = newmaps.Join(
-                    oldmaps, 
+            var mappairs = _newmaps.Join(
+                    _oldmaps, 
                     m => m.TableName, 
                     m => m.TableName,
                     (n, o) => new EntityMappingPair { New = n, Old = o }
                 )
                 .Concat(
-                    oldmaps.Where(o => !newmaps.Any(n => n.TableName == o.TableName))
+                    _oldmaps.Where(o => !_newmaps.Any(n => n.TableName == o.TableName))
                         .Select(o => new EntityMappingPair { New = null as IEntityMap, Old = o })
                 )
                 .Concat(
-                    newmaps.Where(n => !oldmaps.Any(o => o.TableName == n.TableName))
+                    _newmaps.Where(n => !_oldmaps.Any(o => o.TableName == n.TableName))
                         .Select(n => new EntityMappingPair { New = n, Old = null as IEntityMap })
                 )
                 .ToList();
 
-            return mappairs.SelectMany(p => DDLDropIndexes(p.New, p.Old))
-                .Concat(mappairs.SelectMany(p => DDLDropForeignKeys(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLDropUniqueKeys(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLDropTable(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLDropColumns(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLAlterColumns(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLAddColumns(p.New, p.Old)))
-                .Concat(DDLCopyAndRenameTables(mappairs))
-                .Concat(mappairs.SelectMany(p => DDLAddTable(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLAddUniqueKeys(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLAddForeignKeys(p.New, p.Old)))
-                .Concat(mappairs.SelectMany(p => DDLAddIndexes(p.New, p.Old)));
+            List<string> ddl_list = new List<string>();
+
+            ddl_list.AddRange(DDLBeforeModifyTables(mappairs));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLDropIndexes(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLDropForeignKeys(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLDropUniqueKeys(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLDropTable(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLDropColumns(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAlterColumns(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAddColumns(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLCopyAndRenameTable(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAddTable(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAddUniqueKeys(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAddForeignKeys(p.New, p.Old)));
+            ddl_list.AddRange(mappairs.SelectMany(p => DDLAddIndexes(p.New, p.Old)));
+            ddl_list.AddRange(DDLAfterModifyTables(mappairs));
+            return ddl_list;
+        }
+
+        public virtual IEnumerable<string> GetDDL(IEnumerable<IEntityMap> newmaps)
+        {
+            return GetDDL(newmaps, new List<IEntityMap>());
+        }
+
+        public virtual IEnumerable<string> GetDDL<TMapper>(IEnumerable<IEntityMap> oldmaps)
+            where TMapper : EntityMapBuilder, new()
+        {
+            TMapper mapper = new TMapper();
+            return GetDDL(mapper.GetMaps(), oldmaps);
+        }
+
+        public virtual IEnumerable<string> GetDDL<TMapper>()
+            where TMapper : EntityMapBuilder, new()
+        {
+            return GetDDL<TMapper>(new List<IEntityMap>());
+        }
+
+        protected abstract IEnumerable<IEntityMap> GetEntityMaps(DbConnection conn);
+
+        public virtual void InitializeDatabase(DbConnection conn, EntityMapBuilder mapper)
+        {
+            IEnumerable<IEntityMap> newmaps = mapper.GetMaps();
+            IEnumerable<IEntityMap> oldmaps = GetEntityMaps(conn);
+
+            string[] ddl_list = GetDDL(newmaps, oldmaps).ToArray();
+
+            foreach (string ddl_item in ddl_list)
+            {
+                using (DbCommand cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = ddl_item;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+        
+        public virtual void InitializeDatabase<TMapper>(DbConnection conn)
+            where TMapper : EntityMapBuilder, new()
+        {
+            TMapper mapper = new TMapper();
+            InitializeDatabase(conn, mapper);
         }
     }
 }
