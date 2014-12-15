@@ -28,7 +28,72 @@ namespace TSVCEO.DataModelling
         public IColumnDef New;
     }
 
-    public abstract class SQLDbInitializer
+    public interface ISQLDbInitializer
+    {
+        bool AllowDataLoss { get; set; }
+        bool AllowTableCopy { get; set; }
+        SQLQuoteType IdentifierQuoteType { get; }
+        bool SupportsCreateTableWithConstraints { get; }
+        bool SupportsAlterColumn { get; }
+        bool SupportsDropColumn { get; }
+        bool SupportsAddDropConstraint { get; }
+        bool ColumnDataIsVariant { get; }
+
+        IEnumerable<string> GetDDL(IEnumerable<IEntityMap> newmaps, IEnumerable<IEntityMap> oldmaps);
+
+        DbConnection Connect(string connstring);
+
+        void InitializeDatabase(DbConnection conn, EntityMapBuilder mapper);
+    }
+
+    public static class SQLDbInitializerExtensions
+    {
+        public static IEnumerable<string> GetDDL(this ISQLDbInitializer initializer, IEnumerable<IEntityMap> newmaps)
+        {
+            return initializer.GetDDL(newmaps, new List<IEntityMap>());
+        }
+
+        public static IEnumerable<string> GetDDL<TMapper>(this ISQLDbInitializer initializer, IEnumerable<IEntityMap> oldmaps)
+            where TMapper : EntityMapBuilder, new()
+        {
+            TMapper mapper = new TMapper();
+            return initializer.GetDDL(mapper.GetMaps(), oldmaps);
+        }
+
+        public static IEnumerable<string> GetDDL<TMapper>(this ISQLDbInitializer initializer)
+            where TMapper : EntityMapBuilder, new()
+        {
+            return initializer.GetDDL<TMapper>(new List<IEntityMap>());
+        }
+
+        public static void InitializeDatabase<TMapper>(this ISQLDbInitializer initializer, DbConnection conn)
+            where TMapper : EntityMapBuilder, new()
+        {
+            TMapper mapper = new TMapper();
+            initializer.InitializeDatabase(conn, mapper);
+        }
+
+        public static void InitializeDatabase(this ISQLDbInitializer initializer, string connstring, EntityMapBuilder mapper)
+        {
+            using (DbConnection conn = initializer.Connect(connstring))
+            {
+                conn.Open();
+                initializer.InitializeDatabase(conn, mapper);
+            }
+        }
+
+        public static void InitializeDatabase<TMapper>(this ISQLDbInitializer initializer, string connstring)
+            where TMapper : EntityMapBuilder, new()
+        {
+            using (DbConnection conn = initializer.Connect(connstring))
+            {
+                conn.Open();
+                initializer.InitializeDatabase<TMapper>(conn);
+            }
+        }
+    }
+
+    public abstract class SQLDbInitializer : ISQLDbInitializer
     {
         public bool AllowDataLoss { get; set; }
         public bool AllowTableCopy { get; set; }
@@ -608,25 +673,9 @@ namespace TSVCEO.DataModelling
             return ddl_list;
         }
 
-        public virtual IEnumerable<string> GetDDL(IEnumerable<IEntityMap> newmaps)
-        {
-            return GetDDL(newmaps, new List<IEntityMap>());
-        }
-
-        public virtual IEnumerable<string> GetDDL<TMapper>(IEnumerable<IEntityMap> oldmaps)
-            where TMapper : EntityMapBuilder, new()
-        {
-            TMapper mapper = new TMapper();
-            return GetDDL(mapper.GetMaps(), oldmaps);
-        }
-
-        public virtual IEnumerable<string> GetDDL<TMapper>()
-            where TMapper : EntityMapBuilder, new()
-        {
-            return GetDDL<TMapper>(new List<IEntityMap>());
-        }
-
         protected abstract IEnumerable<IEntityMap> GetEntityMaps(DbConnection conn);
+
+        public abstract DbConnection Connect(string connstring);
 
         public virtual void InitializeDatabase(DbConnection conn, EntityMapBuilder mapper)
         {
@@ -643,13 +692,6 @@ namespace TSVCEO.DataModelling
                     cmd.ExecuteNonQuery();
                 }
             }
-        }
-        
-        public virtual void InitializeDatabase<TMapper>(DbConnection conn)
-            where TMapper : EntityMapBuilder, new()
-        {
-            TMapper mapper = new TMapper();
-            InitializeDatabase(conn, mapper);
         }
     }
 }
