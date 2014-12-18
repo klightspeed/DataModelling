@@ -184,98 +184,119 @@ namespace TSVCEO.DataModelling
 
         private void Config(DateTimePropertyConfiguration cfg, IColumnDef col)
         {
+            Console.Write(".HasColumnName({0})", col.Name);
             cfg.HasColumnName(col.Name);
 
             if (col.Type.Precision != null)
             {
+                Console.Write(".HasPrecision({0})", col.Type.Precision);
                 cfg.HasPrecision((byte)col.Type.Precision);
             }
 
             if (col.Type.IsNullable)
             {
+                Console.Write(".IsOptional()");
                 cfg.IsOptional();
             }
             else
             {
+                Console.Write(".IsRequired()");
                 cfg.IsRequired();
             }
         }
 
         private void Config(BinaryPropertyConfiguration cfg, IColumnDef col)
         {
+            Console.Write(".HasColumnName({0})", col.Name);
             cfg.HasColumnName(col.Name);
 
             if (col.Type.Length == null)
             {
+                Console.Write(".IsMaxLength()");
                 cfg.IsMaxLength();
             }
             else
             {
+                Console.Write(".HasMaxLength({0})", col.Type.Length);
                 cfg.HasMaxLength(col.Type.Length);
             }
 
             if (col.Type.IsNullable)
             {
+                Console.Write(".IsOptional()");
                 cfg.IsOptional();
             }
             else
             {
+                Console.Write(".IsRequired()");
                 cfg.IsRequired();
             }
         }
 
         private void Config(DecimalPropertyConfiguration cfg, IColumnDef col)
         {
+            Console.Write(".HasColumnName({0})", col.Name);
             cfg.HasColumnName(col.Name);
 
             if (col.Type.Precision != null)
             {
+                Console.Write(".HasPrecision({0}, {1})", col.Type.Precision, (col.Type.Scale ?? 0));
                 cfg.HasPrecision((byte)col.Type.Precision, (byte)(col.Type.Scale ?? 0));
             }
 
             if (col.Type.IsNullable)
             {
+                Console.Write(".IsOptional()");
                 cfg.IsOptional();
             }
             else
             {
+                Console.Write(".IsRequired()");
                 cfg.IsRequired();
             }
         }
 
         private void Config(PrimitivePropertyConfiguration cfg, IColumnDef col)
         {
+            Console.Write(".HasColumnName({0})", col.Name);
             cfg.HasColumnName(col.Name);
 
             if (col.Type.IsNullable)
             {
+                Console.Write(".IsOptional()");
                 cfg.IsOptional();
             }
             else
             {
+                Console.Write(".IsRequired()");
                 cfg.IsRequired();
             }
         }
 
         private void Config(StringPropertyConfiguration cfg, IColumnDef col)
         {
+            Console.Write(".HasColumnName({0})", col.Name);
             cfg.HasColumnName(col.Name);
 
             if (col.Type.Length == null)
             {
+                Console.Write(".IsMaxLength()");
                 cfg.IsMaxLength();
             }
             else
             {
+                Console.Write(".HasMaxLength({0})", col.Type.Length);
                 cfg.HasMaxLength(col.Type.Length);
             }
 
             if (col.Type.IsNullable)
             {
+                Console.Write(".IsOptional()");
                 cfg.IsOptional();
             }
             else
             {
+                Console.Write(".IsRequired()");
                 cfg.IsRequired();
             }
         }
@@ -285,6 +306,7 @@ namespace TSVCEO.DataModelling
         {
             if (fkmap.ReferencedKey is IManyToOneMap && fkmap.ManyToOneMap.HasMany)
             {
+                Console.Write(".WithOptional({0})", fkmap.ManyToOneMap.PropertyRef.Selector.ToString());
                 var one = cfg.WithOptional((Expression<Func<TTargetEntity, TEntity>>)fkmap.ManyToOneMap.PropertyRef.Selector);
                 Config(one, fkmap);
             }
@@ -292,14 +314,17 @@ namespace TSVCEO.DataModelling
             {
                 if (fkmap.ManyToOneMap == null)
                 {
+                    Console.Write(".WithMany()");
                     Config(cfg.WithMany(), fkmap);
                 }
                 else if (fkmap.ManyToOneMap.HasMany)
                 {
+                    Console.Write(".WithMany({0})", fkmap.ManyToOneMap.PropertyRef.Selector.ToString());
                     Config(cfg.WithMany((Expression<Func<TTargetEntity, ICollection<TEntity>>>)fkmap.ManyToOneMap.PropertyRef.Selector), fkmap);
                 }
                 else
                 {
+                    Console.Write(".WithOptional({0})", fkmap.ManyToOneMap.PropertyRef.Selector.ToString());
                     Config(cfg.WithOptional((Expression<Func<TTargetEntity, TEntity>>)fkmap.ManyToOneMap.PropertyRef.Selector), fkmap);
                 }
             }
@@ -308,20 +333,15 @@ namespace TSVCEO.DataModelling
         private void Config<TTargetEntity>(OptionalNavigationPropertyConfiguration<TEntity, TTargetEntity> cfg, IForeignKeyMap fkmap)
             where TTargetEntity : class
         {
-            if (fkmap.ManyToOneMap == null || fkmap.ManyToOneMap.HasMany)
+            if (fkmap.ManyToOneMap != null && fkmap.ManyToOneMap.HasMany)
             {
-                if (fkmap.ManyToOneMap == null)
-                {
-                    Config(cfg.WithMany(), fkmap);
-                }
-                else
-                {
-                    Config(cfg.WithMany((Expression<Func<TTargetEntity, ICollection<TEntity>>>)fkmap.ManyToOneMap.PropertyRef.Selector), fkmap);
-                }
+                Console.Write(".WithMany({0})", fkmap.ManyToOneMap.PropertyRef.Selector.ToString());
+                Config(cfg.WithMany((Expression<Func<TTargetEntity, ICollection<TEntity>>>)fkmap.ManyToOneMap.PropertyRef.Selector), fkmap);
             }
             else
             {
-                Config(cfg.WithOptionalDependent((Expression<Func<TTargetEntity, TEntity>>)fkmap.ManyToOneMap.PropertyRef.Selector), fkmap);
+                Console.Write(".WithMany()");
+                Config(cfg.WithMany(), fkmap);
             }
         }
 
@@ -330,6 +350,7 @@ namespace TSVCEO.DataModelling
             var colsel = fkmap.IdColumn.Selector;
             if (colsel != null)
             {
+                Console.Write(".HasForeignKey({0})", colsel.ToString());
                 CfgFunc(
                     cfg,
                     fkmap,
@@ -344,6 +365,7 @@ namespace TSVCEO.DataModelling
             }
             else
             {
+                Console.Write(".Map(fk => fk.MapKey(\"{0}\"))", fkmap.IdColumn.Name);
                 Config(cfg.Map(fk => fk.MapKey(fkmap.IdColumn.Name)), fkmap);
             }
         }
@@ -352,6 +374,36 @@ namespace TSVCEO.DataModelling
         {
             Console.Write(".WillCascadeOnDelete(false)");
             cfg.WillCascadeOnDelete(false);
+        }
+
+        private void Config<TTargetEntity>(ManyNavigationPropertyConfiguration<TEntity, TTargetEntity> cfg, IManyToOneMap manymap)
+            where TTargetEntity : class
+        {
+            if (manymap.ForeignKey.IsOptional)
+            {
+                Console.Write(".WithOptional({0})", manymap.ForeignKey.PropertyRef.Selector.ToString());
+                cfg.WithOptional((Expression<Func<TTargetEntity, TEntity>>)manymap.ForeignKey.PropertyRef.Selector);
+            }
+            else
+            {
+                Console.Write(".WithRequired({0})", manymap.ForeignKey.PropertyRef.Selector.ToString());
+                cfg.WithRequired((Expression<Func<TTargetEntity, TEntity>>)manymap.ForeignKey.PropertyRef.Selector);
+            }
+        }
+
+        private void Config<TTargetEntity>(OptionalNavigationPropertyConfiguration<TEntity, TTargetEntity> cfg, IManyToOneMap manymap)
+            where TTargetEntity : class
+        {
+            if (manymap.ForeignKey.IsOptional)
+            {
+                Console.Write(".WithOptionalPrincipal({0})", manymap.ForeignKey.PropertyRef.Selector.ToString());
+                cfg.WithOptionalPrincipal((Expression<Func<TTargetEntity, TEntity>>)manymap.ForeignKey.PropertyRef.Selector);
+            }
+            else
+            {
+                Console.Write(".WithRequired({0})", manymap.ForeignKey.PropertyRef.Selector.ToString());
+                cfg.WithRequired((Expression<Func<TTargetEntity, TEntity>>)manymap.ForeignKey.PropertyRef.Selector);
+            }
         }
 
         public void Add(IColumnMap colmap)
@@ -452,14 +504,15 @@ namespace TSVCEO.DataModelling
 
             if (manymap.HasMany)
             {
+                Type collectiontype = PropType(sel).GetGenericArguments().First();
                 Console.Write("map.HasMany({0})", sel.ToString());
-                CfgAction(this, e => (ICollection<object>)(new object[0]), (m, s) => m.HasMany(s), sel, PropType(sel).GetGenericArguments());
+                CfgFunc(this, manymap, e => (ICollection<object>)(new object[0]), (m, s) => m.HasMany(s), sel, (r, s) => Config(r, s), new Type[] { collectiontype }, new Type[] { typeof(TEntity), collectiontype }, new Type[] { collectiontype });
                 Console.WriteLine();
             }
             else
             {
                 Console.Write("map.HasOptional({0})", sel.ToString());
-                CfgAction(this, e => (object)null, (m, s) => m.HasOptional(s), sel, PropType(sel));
+                CfgFunc(this, manymap, e => (object)null, (m, s) => m.HasOptional(s), sel, (r, s) => Config(r, s), new Type[] { PropType(sel) }, new Type[] { typeof(TEntity), PropType(sel) }, new Type[] { PropType(sel) });
                 Console.WriteLine();
             }
         }
