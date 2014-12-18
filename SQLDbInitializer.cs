@@ -167,6 +167,58 @@ namespace TSVCEO.DataModelling
             }
         }
 
+        protected virtual string GetDefaultValue(IColumnType type)
+        {
+            if (type.IsNullable)
+            {
+                return "NULL";
+            }
+            else
+            {
+                DbType dt = type.DataType;
+
+                if (dt == DbType.AnsiString || 
+                    dt == DbType.AnsiStringFixedLength || 
+                    dt == DbType.String || 
+                    dt == DbType.StringFixedLength)
+                {
+                    return "''";
+                }
+
+                if (dt == DbType.Boolean ||
+                    dt == DbType.Byte ||
+                    dt == DbType.Currency ||
+                    dt == DbType.Decimal ||
+                    dt == DbType.Double ||
+                    dt == DbType.Int16 ||
+                    dt == DbType.Int32 ||
+                    dt == DbType.Int64 ||
+                    dt == DbType.SByte ||
+                    dt == DbType.Single ||
+                    dt == DbType.UInt16 ||
+                    dt == DbType.UInt32 ||
+                    dt == DbType.UInt64)
+                {
+                    return "0";
+                }
+
+                if (dt == DbType.Date ||
+                    dt == DbType.DateTime ||
+                    dt == DbType.DateTime2 ||
+                    dt == DbType.Time)
+                {
+                    return "GETDATE()";
+                }
+
+                if (dt == DbType.Guid)
+                {
+                    return "'00000000-0000-0000-0000-000000000000'";
+                }
+
+                return "''";
+            }
+        }
+
         protected virtual int IntBits(IColumnType type)
         {
             switch (type.DataType)
@@ -366,9 +418,10 @@ namespace TSVCEO.DataModelling
         {
             foreach (IColumnDef coldef in cols)
             {
-                yield return String.Format("{0} {1}",
+                yield return String.Format("{0} {1} DEFAULT {2}",
                     EscapeColumnName(coldef.Name),
-                    GetTypeName(coldef.Type)
+                    GetTypeName(coldef.Type),
+                    GetDefaultValue(coldef.Type)
                 );
             }
         }
@@ -423,12 +476,11 @@ namespace TSVCEO.DataModelling
 
         protected virtual IEnumerable<string> DDLAddColumns(IEntityMap map, IEntityMap original)
         {
-            foreach (IColumnDef coldef in GetAddedColumns(map, original))
+            foreach (string coldef in DDLColumnDefinitions(GetAddedColumns(map, original)))
             {
-                yield return String.Format("ALTER TABLE {0} ADD {1} {2}",
+                yield return String.Format("ALTER TABLE {0} ADD {1}",
                     EscapeTableName(map.TableName),
-                    EscapeColumnName(coldef.Name),
-                    GetTypeName(coldef.Type)
+                    coldef
                 );
             }
         }
@@ -562,9 +614,12 @@ namespace TSVCEO.DataModelling
         {
             if (copytoname != map.TableName)
             {
+                List<IColumnDef> copycols = GetCopiedColumns(map, original).ToList();
+                List<IColumnDef> addcols = GetAddedColumns(map, original).ToList();
+
                 yield return String.Format("INSERT INTO {0} SELECT {1} FROM {2}",
                     EscapeTableName(copytoname),
-                    String.Join(", ", GetCopiedColumns(map, original).Select(c => EscapeColumnName(c.Name))),
+                    String.Join(", ", copycols.Select(c => EscapeColumnName(c.Name)).Concat(addcols.Select(c => String.Format("{0} AS {1}", GetDefaultValue(c.Type), EscapeColumnName(c.Name))))),
                     map.TableName
                 );
             }
@@ -675,7 +730,22 @@ namespace TSVCEO.DataModelling
 
         protected abstract IEnumerable<IEntityMap> GetEntityMaps(DbConnection conn);
 
-        public abstract DbConnection Connect(string connstring);
+        public virtual DbConnection Connect(string connstring)
+        {
+            DbConnection conn = GetEntityFrameworkProviderFactory().CreateConnection();
+            conn.ConnectionString = connstring;
+            return conn;
+        }
+
+        public virtual DbProviderFactory GetEntityFrameworkProviderFactory()
+        {
+            throw new InvalidOperationException();
+        }
+
+        public virtual DbProviderFactory GetLinqToSqlProviderFactory()
+        {
+            throw new InvalidOperationException();
+        }
 
         public virtual void InitializeDatabase(DbConnection conn, EntityMapBuilder mapper)
         {
