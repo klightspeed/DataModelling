@@ -50,6 +50,7 @@ namespace TSVCEO.DataModelling
         LambdaExpression Selector { get; }
         string PropertyName { get; }
         Type PropertyType { get; }
+        PropertyInfo MemberInfo { get; }
         Type EntityType { get; }
         bool IsValid { get; }
         IEntityMap Table { get; }
