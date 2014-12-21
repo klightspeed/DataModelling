@@ -5,7 +5,7 @@ using System.Text;
 using System.Data.Common;
 using System.Data.Entity;
 
-namespace TSVCEO.DataModelling
+namespace TSVCEO.DataModelling.EntityFramework
 {
     public abstract class DataContext : DbContext, IDataSession
     {

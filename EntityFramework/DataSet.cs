@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Data.Entity;
 
-namespace TSVCEO.DataModelling
+namespace TSVCEO.DataModelling.EntityFramework
 {
     public class DataRepository<TEntity> : IRepository<TEntity>
         where TEntity : class

@@ -8,7 +8,7 @@ using System.Data.Entity.ModelConfiguration;
 using System.Data.Entity.ModelConfiguration.Configuration;
 using System.Reflection;
 
-namespace TSVCEO.DataModelling
+namespace TSVCEO.DataModelling.EntityFramework
 {
     public class EntityModelBuilder : IEntityMapConsumer
     {

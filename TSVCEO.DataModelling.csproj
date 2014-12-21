@@ -44,13 +44,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DataContext.cs">
+    <Compile Include="EntityFramework\DataContext.cs">
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="DataRepository.cs" />
+    <Compile Include="EntityFramework\DataSet.cs" />
     <Compile Include="EntityMapInterfaces.cs" />
     <Compile Include="EntityMap.cs" />
-    <Compile Include="EntityModelBuilder.cs">
+    <Compile Include="EntityFramework\EntityModelBuilder.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="IDatabaseSeed.cs" />
