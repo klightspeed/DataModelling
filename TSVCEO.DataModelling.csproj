@@ -58,7 +58,9 @@
     <Compile Include="IDataSession.cs" />
     <Compile Include="IDataSessionFactory.cs" />
     <Compile Include="IRepository.cs" />
-    <Compile Include="Linq\EntityProxyBuilder.cs" />
+    <Compile Include="Linq\DataContext.cs" />
+    <Compile Include="Linq\DataSet.cs" />
+    <Compile Include="Linq\XmlMappingBuilder.cs" />
     <Compile Include="SQLDbInitializer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
