@@ -484,17 +484,20 @@ namespace TSVCEO.DataModelling.EntityFramework
         {
             LambdaExpression sel = fkmap.PropertyRef.Selector;
 
-            if (fkmap.IsOptional)
+            if (sel != null)
             {
-                Console.Write("map.HasOptional({0})", sel.ToString());
-                CfgFunc(this, fkmap, e => (object)null, (m, s) => m.HasOptional(s), sel, (r, s) => Config(r, s), new Type[] { PropType(sel) }, new Type[] { typeof(TEntity), PropType(sel) }, new Type[] { PropType(sel) });
-                Console.WriteLine();
-            }
-            else
-            {
-                Console.Write("map.HasRequired({0})", sel.ToString());
-                CfgFunc(this, fkmap, e => (object)null, (m, s) => m.HasRequired(s), sel, (r, s) => Config(r, s), new Type[] { PropType(sel) }, new Type[] { typeof(TEntity), PropType(sel) }, new Type[] { PropType(sel) });
-                Console.WriteLine();
+                if (fkmap.IsOptional)
+                {
+                    Console.Write("map.HasOptional({0})", sel.ToString());
+                    CfgFunc(this, fkmap, e => (object)null, (m, s) => m.HasOptional(s), sel, (r, s) => Config(r, s), new Type[] { PropType(sel) }, new Type[] { typeof(TEntity), PropType(sel) }, new Type[] { PropType(sel) });
+                    Console.WriteLine();
+                }
+                else
+                {
+                    Console.Write("map.HasRequired({0})", sel.ToString());
+                    CfgFunc(this, fkmap, e => (object)null, (m, s) => m.HasRequired(s), sel, (r, s) => Config(r, s), new Type[] { PropType(sel) }, new Type[] { typeof(TEntity), PropType(sel) }, new Type[] { PropType(sel) });
+                    Console.WriteLine();
+                }
             }
         }
 

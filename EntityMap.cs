@@ -101,6 +101,65 @@ namespace TSVCEO.DataModelling
 
     public class EntityMapper<TEntity> : EntityMapper where TEntity : class
     {
+        public class AssociationMapper<TTargetEntity>
+            where TTargetEntity : class
+        {
+            protected EntityMapper<TEntity> mapper;
+
+            public AssociationMapper(EntityMapper<TEntity> mapper)
+            {
+                this.mapper = mapper;
+            }
+
+            public void AddForeignKey<TIdProperty>(
+                string foreignkeyname,
+                Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+                Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel,
+                Action<IColumnMap> idcolmap = null,
+                Action<IForeignKeyMap> fkmap = null)
+                where TIdProperty : struct
+            {
+                mapper.AddForeignKey(foreignkeyname, null, idpropsel, fkpropsel, idcolmap, fkmap);
+            }
+
+            public void AddForeignKey<TIdProperty>(
+                string foreignkeyname,
+                Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+                Expression<Func<TEntity, TIdProperty>> fkpropsel,
+                bool optional = false,
+                Action<IColumnMap> idcolmap = null,
+                Action<IForeignKeyMap> fkmap = null)
+            {
+                mapper.AddForeignKey(foreignkeyname, null, idpropsel, fkpropsel, optional, idcolmap, fkmap);
+            }
+
+            public void AddForeignKeyMultiColumn<TIdProperty, TOut>(
+                string foreignkeyname,
+                Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+                Expression<Func<TEntity, TIdProperty>> fkpropsel,
+                Expression<Func<TEntity, TOut>> columns,
+                Expression<Func<TTargetEntity, TOut>> tgtcolumns,
+                bool optional = false,
+                Action<IColumnMap> idcolmap = null,
+                Action<IForeignKeyMap> fkmap = null)
+            {
+                mapper.AddForeignKeyMultiColumn(foreignkeyname, null, idpropsel, fkpropsel, columns, tgtcolumns, optional, idcolmap, fkmap);
+            }
+
+            public void AddForeignKeyMultiColumn<TIdProperty, TOut>(
+                string foreignkeyname,
+                Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+                Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel,
+                Expression<Func<TEntity, TOut>> columns,
+                Expression<Func<TTargetEntity, TOut>> tgtcolumns,
+                Action<IColumnMap> idcolmap = null,
+                Action<IForeignKeyMap> fkmap = null)
+                where TIdProperty : struct
+            {
+                mapper.AddForeignKeyMultiColumn(foreignkeyname, null, idpropsel, fkpropsel, columns, tgtcolumns, idcolmap, fkmap);
+            }
+        }
+
         public EntityMapper(IEntityMap map, EntityMapBuilder maps)
         {
             this.EntityMap = map;
@@ -205,16 +264,22 @@ namespace TSVCEO.DataModelling
             return AddUniqueKey(keyname, GetSelectors(colsels));
         }
 
-        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty>(
-            Expression<Func<TEntity, TTargetEntity>> propsel, 
-            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
-            IColumnMap fkcolumn, 
-            IUniqueKeyMap uniquekey, 
-            Action<IColumnMap> idcolmap = null, 
-            Action<IForeignKeyMap> fkmap = null
-        )
+        public AssociationMapper<TTargetEntity> Target<TTargetEntity>()
+            where TTargetEntity : class
         {
-            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+            return new AssociationMapper<TTargetEntity>(this);
+        }
+
+        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel,
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+            IColumnMap fkcolumn,
+            IUniqueKeyMap uniquekey,
+            Action<IColumnMap> idcolmap = null,
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
             var fk = new ForeignKeyMap(this.EntityMap, propsel, fkcolumn.Column, "FK_" + typeof(TEntity).Name + "_" + foreignkeyname);
 
@@ -229,17 +294,36 @@ namespace TSVCEO.DataModelling
 
             EntityMap.ForeignKeys.Add(fk);
         }
-
-        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty, TOut>(
+        
+        /*
+        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty>(
             Expression<Func<TEntity, TTargetEntity>> propsel, 
             Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
             IColumnMap fkcolumn, 
             IUniqueKeyMap uniquekey, 
-            Expression<Func<TEntity, TOut>> colsels, 
             Action<IColumnMap> idcolmap = null, 
             Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+            where TIdProperty : struct
         {
-            AddForeignKeyInternal(propsel, idpropsel, fkcolumn, uniquekey, idcolmap: idcolmap, fkmap: fk =>
+            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKeyInternal(foreignkeyname, propsel, idpropsel, fkcolumn, uniquekey, idcolmap, fkmap);
+        }
+         */
+
+        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty, TOut>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel,
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+            IColumnMap fkcolumn,
+            IUniqueKeyMap uniquekey,
+            Expression<Func<TEntity, TOut>> colsels,
+            Action<IColumnMap> idcolmap = null,
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
+            AddForeignKeyInternal(foreignkeyname, propsel, idpropsel, fkcolumn, uniquekey, idcolmap: idcolmap, fkmap: fk =>
             {
                 foreach (LambdaExpression colsel in GetSelectors(colsels))
                 {
@@ -268,15 +352,33 @@ namespace TSVCEO.DataModelling
             });
         }
 
-        protected void AddForeignKeyDeferred<TTargetEntity, TIdProperty>(
+        /*
+        protected void AddForeignKeyInternal<TTargetEntity, TIdProperty, TOut>(
             Expression<Func<TEntity, TTargetEntity>> propsel, 
             Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
             IColumnMap fkcolumn, 
+            IUniqueKeyMap uniquekey, 
+            Expression<Func<TEntity, TOut>> colsels, 
             Action<IColumnMap> idcolmap = null, 
             Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
+            where TIdProperty : struct
         {
             string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKeyInternal(foreignkeyname, propsel, idpropsel, fkcolumn, uniquekey, colsels, idcolmap, fkmap);
+        }
+         */
+
+        protected void AddForeignKeyDeferred<TTargetEntity, TIdProperty>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel,
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+            IColumnMap fkcolumn,
+            Action<IColumnMap> idcolmap = null,
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
 
             var tgt = Maps.GetMapForType<TTargetEntity>();
@@ -290,7 +392,7 @@ namespace TSVCEO.DataModelling
                     throw new InvalidOperationException("Target entity does not have a primary key");
                 }
 
-                AddForeignKeyInternal(propsel, idpropsel, fkcolumn, uniquekey, idcolmap: idcolmap, fkmap: fkmap);
+                AddForeignKeyInternal(foreignkeyname, propsel, idpropsel, fkcolumn, uniquekey, idcolmap: idcolmap, fkmap: fkmap);
 
                 return;
             }
@@ -298,11 +400,32 @@ namespace TSVCEO.DataModelling
             throw new InvalidOperationException("Foreign Key mapping failed");
         }
 
-        public void AddForeignKey<TTargetEntity, TIdProperty>(Expression<Func<TEntity, TTargetEntity>> propsel, Expression<Func<TTargetEntity, TIdProperty>> idpropsel, Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel, Action<IColumnMap> idcolmap = null, Action<IForeignKeyMap> fkmap = null)
+        /*
+        protected void AddForeignKeyDeferred<TTargetEntity, TIdProperty>(
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            IColumnMap fkcolumn, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
             where TIdProperty : struct
         {
             string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKeyDeferred(foreignkeyname, propsel, idpropsel, fkcolumn, idcolmap, fkmap);
+        }
+         */
+
+        protected void AddForeignKey<TTargetEntity, TIdProperty>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+            where TIdProperty : struct
+        {
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
 
             IColumnMap fkcolumn;
@@ -316,13 +439,33 @@ namespace TSVCEO.DataModelling
                 fkcolumn = AddColumn(fkpropsel, idcolmap);
             }
 
-            AddDeferredForeignKeyAction(() => AddForeignKeyDeferred(propsel, idpropsel, fkcolumn, idcolmap, fk => { fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
+            AddDeferredForeignKeyAction(() => AddForeignKeyDeferred(foreignkeyname, propsel, idpropsel, fkcolumn, idcolmap, fk => { fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
         }
 
-        public void AddForeignKey<TTargetEntity, TIdProperty>(Expression<Func<TEntity, TTargetEntity>> propsel, Expression<Func<TTargetEntity, TIdProperty>> idpropsel, Expression<Func<TEntity, TIdProperty>> fkpropsel, bool optional = false, Action<IColumnMap> idcolmap = null, Action<IForeignKeyMap> fkmap = null)
+        public void AddForeignKey<TTargetEntity, TIdProperty>(
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
+            where TIdProperty : struct
         {
             string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKey(foreignkeyname, propsel, idpropsel, fkpropsel, idcolmap, fkmap);
+        }
+
+        protected void AddForeignKey<TTargetEntity, TIdProperty>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, TIdProperty>> fkpropsel, 
+            bool optional = false, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
             string idcolname = foreignkeyname;
 
@@ -337,15 +480,37 @@ namespace TSVCEO.DataModelling
                 fkcolumn = AddColumn(fkpropsel, idcolmap);
             }
 
-            AddDeferredForeignKeyAction(() => AddForeignKeyDeferred(propsel, idpropsel, fkcolumn, idcolmap, fk => { if (optional) fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
+            AddDeferredForeignKeyAction(() => AddForeignKeyDeferred(foreignkeyname, propsel, idpropsel, fkcolumn, idcolmap, fk => { if (optional) fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
         }
 
-        protected void AddForeignKeyMultiColumnDeferred<TTargetEntity, TIdProperty, TOut>(Expression<Func<TEntity, TTargetEntity>> propsel, Expression<Func<TTargetEntity, TIdProperty>> idpropsel, IColumnMap fkcolumn, Expression<Func<TEntity, TOut>> columns, Expression<Func<TTargetEntity, TOut>> tgtcolumns, Action<IColumnMap> idcolmap = null, Action<IForeignKeyMap> fkmap = null)
+        public void AddForeignKey<TTargetEntity, TIdProperty>(
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, TIdProperty>> fkpropsel, 
+            bool optional = false, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
+            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKey(foreignkeyname, propsel, idpropsel, fkpropsel, optional, idcolmap, fkmap);
+        }
+
+        protected void AddForeignKeyMultiColumnDeferred<TTargetEntity, TIdProperty, TOut>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            IColumnMap fkcolumn, 
+            Expression<Func<TEntity, TOut>> columns, 
+            Expression<Func<TTargetEntity, TOut>> tgtcolumns, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
         {
             IEntityMap tgt = Maps.GetMapForType<TTargetEntity>();
             EntityMapper<TTargetEntity> tgtmapper = Maps.GetMapperForType<TTargetEntity>();
-            string keyname = typeof(TEntity).Name + "_" + ((MemberExpression)(propsel.Body)).Member.Name;
+            string keyname = typeof(TEntity).Name + "_" + foreignkeyname;
 
             if (tgt != null)
             {
@@ -356,17 +521,25 @@ namespace TSVCEO.DataModelling
                     throw new InvalidOperationException("Unique key creation failed");
                 }
 
-                AddForeignKeyInternal(propsel, idpropsel, fkcolumn, uniquekey, columns, idcolmap, fkmap);
+                AddForeignKeyInternal(foreignkeyname, propsel, idpropsel, fkcolumn, uniquekey, columns, idcolmap, fkmap);
                 return;
             }
 
             throw new InvalidOperationException("Foreign Key mapping failed");
         }
 
-        public void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(Expression<Func<TEntity, TTargetEntity>> propsel, Expression<Func<TTargetEntity, TIdProperty>> idpropsel, Expression<Func<TEntity, TIdProperty>> fkpropsel, Expression<Func<TEntity, TOut>> columns, Expression<Func<TTargetEntity, TOut>> tgtcolumns, bool optional = false, Action<IColumnMap> idcolmap = null, Action<IForeignKeyMap> fkmap = null)
+        protected void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, TIdProperty>> fkpropsel, 
+            Expression<Func<TEntity, TOut>> columns, 
+            Expression<Func<TTargetEntity, TOut>> tgtcolumns, 
+            bool optional = false, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
         {
-            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
             string idcolname = foreignkeyname;
 
@@ -381,14 +554,37 @@ namespace TSVCEO.DataModelling
                 fkcolumn = AddColumn(fkpropsel, c => { if (optional) c.IsOptional(); if (idcolmap != null) idcolmap(c); });
             }
 
-            AddDeferredForeignKeyAction(() => AddForeignKeyMultiColumnDeferred(propsel, idpropsel, fkcolumn, columns, tgtcolumns, idcolmap, fk => { if (optional) fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
+            AddDeferredForeignKeyAction(() => AddForeignKeyMultiColumnDeferred(foreignkeyname, propsel, idpropsel, fkcolumn, columns, tgtcolumns, idcolmap, fk => { if (optional) fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
         }
 
-        public void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(Expression<Func<TEntity, TTargetEntity>> propsel, Expression<Func<TTargetEntity, TIdProperty>> idpropsel, Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel, Expression<Func<TEntity, TOut>> columns, Expression<Func<TTargetEntity, TOut>> tgtcolumns, Action<IColumnMap> idcolmap = null, Action<IForeignKeyMap> fkmap = null)
+        public void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(
+            Expression<Func<TEntity, TTargetEntity>> propsel,
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+            Expression<Func<TEntity, TIdProperty>> fkpropsel,
+            Expression<Func<TEntity, TOut>> columns,
+            Expression<Func<TTargetEntity, TOut>> tgtcolumns,
+            bool optional = false,
+            Action<IColumnMap> idcolmap = null,
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+        {
+            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKeyMultiColumn(foreignkeyname, propsel, idpropsel, fkpropsel, columns, tgtcolumns, optional, idcolmap, fkmap);
+        }
+
+        protected void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(
+            string foreignkeyname,
+            Expression<Func<TEntity, TTargetEntity>> propsel, 
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel, 
+            Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel, 
+            Expression<Func<TEntity, TOut>> columns, 
+            Expression<Func<TTargetEntity, TOut>> tgtcolumns, 
+            Action<IColumnMap> idcolmap = null, 
+            Action<IForeignKeyMap> fkmap = null)
             where TTargetEntity : class
             where TIdProperty : struct
         {
-            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
             string idpropname = ((MemberExpression)idpropsel.Body).Member.Name;
             string idcolname = foreignkeyname;
 
@@ -403,7 +599,23 @@ namespace TSVCEO.DataModelling
                 fkcolumn = AddColumn(fkpropsel, idcolmap);
             }
 
-            AddDeferredForeignKeyAction(() => AddForeignKeyMultiColumnDeferred(propsel, idpropsel, fkcolumn, columns, tgtcolumns, idcolmap, fk => { fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
+            AddDeferredForeignKeyAction(() => AddForeignKeyMultiColumnDeferred(foreignkeyname, propsel, idpropsel, fkcolumn, columns, tgtcolumns, idcolmap, fk => { fk.IsOptional = true; if (fkmap != null) fkmap(fk); }));
+        }
+
+        public void AddForeignKeyMultiColumn<TTargetEntity, TIdProperty, TOut>(
+            Expression<Func<TEntity, TTargetEntity>> propsel,
+            Expression<Func<TTargetEntity, TIdProperty>> idpropsel,
+            Expression<Func<TEntity, Nullable<TIdProperty>>> fkpropsel,
+            Expression<Func<TEntity, TOut>> columns,
+            Expression<Func<TTargetEntity, TOut>> tgtcolumns,
+            Action<IColumnMap> idcolmap = null,
+            Action<IForeignKeyMap> fkmap = null)
+            where TTargetEntity : class
+            where TIdProperty : struct
+        {
+            string foreignkeyname = ((MemberExpression)propsel.Body).Member.Name;
+
+            AddForeignKeyMultiColumn(foreignkeyname, propsel, idpropsel, fkpropsel, columns, tgtcolumns, idcolmap, fkmap);
         }
 
         protected void AddManyToOneMapDeferred<TTargetEntity>(Expression<Func<TEntity, ICollection<TTargetEntity>>> propsel, Expression<Func<TTargetEntity, TEntity>> fksel)
