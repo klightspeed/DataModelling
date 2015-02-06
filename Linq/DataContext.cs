@@ -10,20 +10,23 @@ namespace TSVCEO.DataModelling.Linq
     public abstract class DataContext : System.Data.Linq.DataContext, IDataSession
     {
         protected bool _OwnsConnection;
+        protected DbConnection _Connection;
 
         public DataContextFactory Factory { get; protected set; }
 
         public DataContext(DataContextFactory factory, DbConnection conn, bool ownsconn)
             : base(conn, XmlMappingBuilder.CreateMapping(factory.GetEntityMapper().GetMaps(), conn.Database))
         {
+            this._Connection = conn;
             this._OwnsConnection = ownsconn;
+            this.Log = Console.Out;
         }
 
         protected override void Dispose(bool disposing)
         {
             if (_OwnsConnection)
             {
-                this.Connection.Dispose();
+                this._Connection.Dispose();
             }
 
             base.Dispose(disposing);
@@ -36,14 +39,7 @@ namespace TSVCEO.DataModelling.Linq
 
         void IDataSession.SaveChanges()
         {
-            try
-            {
-                this.SubmitChanges();
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            this.SubmitChanges();
         }
 
         void IDataSession.Close()

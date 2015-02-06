@@ -56,22 +56,36 @@ namespace TSVCEO.DataModelling.Linq
 
         protected static XElement CreateForeignKeyMapping(IForeignKeyMap fkmap)
         {
-            return new XElement(ns + "Association",
-                new XAttribute("Member", fkmap.PropertyRef.PropertyName),
-                new XAttribute("ThisKey", fkmap.IdColumn.PropertyName),
-                new XAttribute("OtherKey", fkmap.ReferencedKey.Table.IdColumn.PropertyRef.PropertyName),
-                new XAttribute("IsForeignKey", "True")
-            );
+            if (fkmap.PropertyRef.PropertyName != null)
+            {
+                return new XElement(ns + "Association",
+                    new XAttribute("Member", fkmap.PropertyRef.PropertyName),
+                    new XAttribute("ThisKey", fkmap.IdColumn.PropertyName),
+                    new XAttribute("OtherKey", fkmap.ReferencedKey.Table.IdColumn.PropertyRef.PropertyName),
+                    new XAttribute("IsForeignKey", "True")
+                );
+            }
+            else
+            {
+                return null;
+            }
         }
 
         protected static XElement CreateAssociationMapping(IManyToOneMap manymap)
         {
-            return new XElement(ns + "Association",
-                new XAttribute("Member", manymap.PropertyRef.PropertyName),
-                new XAttribute("ThisKey", manymap.Table.IdColumn.PropertyRef.PropertyName),
-                new XAttribute("OtherKey", manymap.ForeignKey.IdColumn.PropertyName),
-                new XAttribute("IsUnique", manymap.HasMany ? "False" : "True")
-            );
+            if (manymap.PropertyRef.PropertyName != null)
+            {
+                return new XElement(ns + "Association",
+                    new XAttribute("Member", manymap.PropertyRef.PropertyName),
+                    new XAttribute("ThisKey", manymap.Table.IdColumn.PropertyRef.PropertyName),
+                    new XAttribute("OtherKey", manymap.ForeignKey.IdColumn.PropertyName),
+                    new XAttribute("IsUnique", manymap.HasMany ? "False" : "True")
+                );
+            }
+            else
+            {
+                return null;
+            }
         }
     }
 }

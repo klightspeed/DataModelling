@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Data.Linq;
 
@@ -41,9 +42,9 @@ namespace TSVCEO.DataModelling.Linq
 
         
 
-        IQueryable<TEntity> IRepository<TEntity>.Query()
+        IEnumerable<TEntity> IRepository<TEntity>.Where(Expression<Func<TEntity, bool>> predicate)
         {
-            return DataSet.AsQueryable<TEntity>();
+            return DataSet.AsQueryable<TEntity>().Where(predicate).ToList();
         }
     }
 }

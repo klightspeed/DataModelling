@@ -30,14 +30,7 @@ namespace TSVCEO.DataModelling.EntityFramework
 
         void IDataSession.SaveChanges()
         {
-            try
-            {
-                SaveChanges();
-            }
-            catch (Exception ex)
-            {
-                throw;
-            }
+            SaveChanges();
         }
 
         void IDataSession.Close()
